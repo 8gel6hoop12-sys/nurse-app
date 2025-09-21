@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>看護アプリ UI（最小構成）</title>
+<style>
+:root{--bg:#0c0d10;--panel:#151821;--panel2:#1b2030;--text:#f2f5ff;--muted:#9aa4bf;--accent:#5da0ff;--ok:#35d07f;--warn:#ffb020;--err:#ff5d7a;--r:14px}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:linear-gradient(180deg,#0c0d10 0%,#0e1220 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;line-height:1.5;letter-spacing:.2px}
+.topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(12,13,16,.7);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.06)}
+.brand{font-weight:700}.nav{display:flex;gap:8px}
+.tab-btn{background:var(--panel);color:var(--text);border:1px solid rgba(255,255,255,.08);padding:8px 12px;border-radius:10px;cursor:pointer}
+.tab-btn.active{outline:2px solid var(--accent)}
+main{padding:20px;max-width:1100px;margin:0 auto}
+h2{margin:10px 0}
+.grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+.card{background:linear-gradient(180deg,var(--panel) 0%,var(--panel2) 100%);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+textarea{width:100%;height:180px;background:#0f1320;color:var(--text);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;resize:vertical}
+input[type=text],input[type=password],select{width:100%;background:#0f1320;color:var(--text);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;margin:6px 0 12px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+button{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
+button.secondary{background:#2b3250}button:disabled{opacity:.6;cursor:not-allowed}
+.note,.hint{color:var(--muted);font-size:.9rem}
+.endpoint-info{display:grid;gap:6px;margin:8px 0;padding:8px;background:#0f1320;border-radius:8px}
+.pre{background:#0b0e18;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;min-height:160px;overflow:auto}
+.drop{border:2px dashed rgba(255,255,255,.2);border-radius:12px;padding:24px;text-align:center;color:var(--muted)}
+.drop.dragover{border-color:var(--accent);color:#fff}
+.table{overflow:auto}.table table{width:100%;border-collapse:collapse}
+.table th,.table td{border-bottom:1px solid rgba(255,255,255,.08);padding:8px;text-align:left}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.8rem}
+.badge.ok{background:rgba(53,208,127,.15);color:var(--ok)}
+.badge.warn{background:rgba(255,176,32,.15);color:var(--warn)}
+.badge.err{background:rgba(255,93,122,.15);color:var(--err)}
+.footer{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:16px;color:var(--muted)}
+.toast{position:fixed;right:16px;bottom:16px;min-width:220px;background:#11162a;color:#fff;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.08);opacity:0;transform:translateY(10px);transition:.2s}
+.toast.show{opacity:1;transform:translateY(0)}
+.hidden{display:none}
+.gate{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center}
+.gate-card{width:min(92vw,420px);background:#0f1320;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:20px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">看護アプリ UI（最小構成）</div>
+  <nav class="nav">
+    <button class="tab-btn active" data-tab="tab-run">実行</button>
+    <button class="tab-btn" data-tab="tab-records">記録プレビュー</button>
+    <button class="tab-btn" data-tab="tab-settings">設定</button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-run" class="tab active">
+    <h2>既存 Python ロジックの実行</h2>
+
+    <div class="card">
+      <h3>ワンクリック起動（URLでローカルサーバを立ち上げ）</h3>
+      <div class="actions">
+        <button id="btnStartLocal">ローカルサーバ起動（nurseapp://start）</button>
+        <button id="btnCopyStartUrl" class="secondary">起動URLをコピー</button>
+        <span id="srvStatus" class="hint">未接続</span>
+      </div>
+      <p class="hint">※ 初回のみ、ローカルで <code>python nurseapp_one.py --install-protocol</code> を実行して
+        <code>nurseapp://</code> を登録してください（Windows）。</p>
+    </div>
+
+    <div class="card">
+      <p><code>assessment.py / diagnosis.py / careplan.py / record.py</code> をサーバ経由で実行します（Python側は無改変）。</p>
+      <div class="endpoint-info">
+        <div>assessment: <code id="epAssess"></code></div>
+        <div>diagnosis: <code id="epDiag"></code></div>
+        <div>record:    <code id="epRec"></code></div>
+        <div>careplan : <code id="epCare"></code></div>
+        <div>fetch files: <code id="epFiles"></code></div>
+      </div>
+      <div class="actions">
+        <button id="btnRunAssessment">Assessment 実行</button>
+        <button id="btnRunDiagnosis">Diagnosis 実行</button>
+        <button id="btnRunRecord">Record 実行</button>
+        <button id="btnRunCareplan">Careplan 実行</button>
+      </div>
+      <div class="result card" id="runLog" aria-live="polite"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>最新の出力を取得</h3>
+        <div class="actions">
+          <button data-file="assessment_result.txt" class="btnFetch">assessment_result.txt</button>
+          <button data-file="diagnosis_result.txt" class="btnFetch">diagnosis_result.txt</button>
+          <button data-file="record_result.txt" class="btnFetch">record_result.txt</button>
+          <button data-file="careplan_result.txt" class="btnFetch">careplan_result.txt</button>
+        </div>
+        <pre id="filePreview" class="pre"></pre>
+      </div>
+      <div class="card">
+        <h3>ドラッグ＆ドロップ（ファイルモード）</h3>
+        <div id="dropZone" class="drop">ここに *.txt をドロップ</div>
+        <pre id="dropPreview" class="pre"></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-records" class="tab">
+    <h2>記録プレビュー</h2>
+    <div class="card">
+      <h3>貼り付け or 上で取得/ドロップ</h3>
+      <textarea id="recordsRaw" placeholder="assessment_result.txt / diagnosis_result.txt / record_result.txt / careplan_result.txt の内容を貼る"></textarea>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>正常/異常サマリ（簡易）</h3>
+        <div id="summaryTable" class="table"></div>
+        <button id="btnSummarize">サマリ生成</button>
+      </div>
+      <div class="card">
+        <h3>カテゴリ表示</h3>
+        <div id="prettyView"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-settings" class="tab">
+    <h2>設定</h2>
+    <div class="card">
+      <h3>エンドポイント</h3>
+      <label>Base URL</label><input id="cfgBase" type="text" />
+      <label>Get File（:name をファイル名に置換）</label><input id="cfgFiles" type="text" />
+      <div class="actions">
+        <button id="btnSaveCfg">保存</button>
+        <button id="btnResetCfg">リセット</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© 看護アプリ UI（最小構成）</span>
+  <span id="ts"></span>
+</footer>
+<div id="toast" class="toast"></div>
+
+<script>
+const config = {
+  baseUrl: "http://127.0.0.1:8008",
+  endpoints: {
+    assessment: "/run/assessment",
+    diagnosis:  "/run/diagnosis",
+    record:     "/run/record",
+    careplan:   "/run/careplan",
+    getFile:    "/files/:name",
+  },
+  protocolStart: "nurseapp://start",
+  healthIntervalMs: 800,
+  healthMaxTries: 20
+};
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const toast = m => { const t=$("#toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2000); };
+
+$$(".tab-btn").forEach(b=>b.addEventListener("click",()=>{
+  $$(".tab-btn").forEach(x=>x.classList.remove("active")); b.classList.add("active");
+  const id=b.dataset.tab; $$(".tab").forEach(t=>t.classList.remove("active")); $("#"+id).classList.add("active");
+}));
+
+function refreshLabels(){
+  $("#epAssess").textContent = config.baseUrl + config.endpoints.assessment;
+  $("#epDiag").textContent   = config.baseUrl + config.endpoints.diagnosis;
+  $("#epRec").textContent    = config.baseUrl + config.endpoints.record;
+  $("#epCare").textContent   = config.baseUrl + config.endpoints.careplan;
+  $("#epFiles").textContent  = config.baseUrl + config.endpoints.getFile;
+}
+const srvStatus = ()=>$("#srvStatus") || {textContent:""};
+
+async function isHealthy(){
+  try{
+    const r = await fetch(config.baseUrl + "/healthz", {cache:"no-store"});
+    if(!r.ok) return false;
+    const js = await r.json().catch(()=> ({}));
+    return !!js.ok;
+  }catch{ return false; }
+}
+async function waitHealthy(maxTries=config.healthMaxTries){
+  srvStatus().textContent = "接続待機中...";
+  for(let i=0;i<maxTries;i++){
+    if(await isHealthy()){ srvStatus().textContent="接続OK"; toast("ローカルサーバに接続しました"); return true; }
+    await new Promise(r=>setTimeout(r, config.healthIntervalMs));
+  }
+  srvStatus().textContent = "未接続"; return false;
+}
+function openProtocol(){
+  try{
+    const ifr=document.createElement("iframe"); ifr.style.display="none"; ifr.src=config.protocolStart;
+    document.body.appendChild(ifr); setTimeout(()=>ifr.remove(),3000);
+  }catch{ location.href = config.protocolStart; }
+}
+$("#btnStartLocal")?.addEventListener("click", async ()=>{
+  srvStatus().textContent = "起動URL送信中…";
+  openProtocol();
+  await waitHealthy();
+});
+$("#btnCopyStartUrl")?.addEventListener("click", async ()=>{
+  try{ await navigator.clipboard.writeText(config.protocolStart); toast("起動URLをコピーしました（nurseapp://start）"); }
+  catch{ toast("コピーに失敗。手動で選択してください: nurseapp://start"); }
+});
+
+async function postRun(path, payload){
+  const url = config.baseUrl + path;
+  const log = $("#runLog");
+  log.textContent = `POST ${url}\n...処理中`;
+  try{
+    const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload||{}) });
+    const text = await res.text();
+    log.textContent = `POST ${url}\nStatus: ${res.status}\n\n${text}`;
+    if(!res.ok) throw new Error("非200応答"); toast("実行しました");
+  }catch(e){ log.textContent += `\n\nエラー: ${e.message}`; toast("エラーが発生しました"); }
+}
+$("#btnRunAssessment")?.addEventListener("click",()=>{
+  const s = localStorage.getItem("draft_s") || ""; const o = localStorage.getItem("draft_o") || "";
+  postRun(config.endpoints.assessment, {S:s,O:o});
+});
+$("#btnRunDiagnosis")?.addEventListener("click",()=> postRun(config.endpoints.diagnosis, {}));
+$("#btnRunRecord")?.addEventListener("click",()=> postRun(config.endpoints.record, {}));
+$("#btnRunCareplan")?.addEventListener("click",()=> postRun(config.endpoints.careplan, {}));
+
+async function fetchFile(name){
+  const url = config.baseUrl + config.endpoints.getFile.replace(":name", encodeURIComponent(name));
+  const pre = $("#filePreview"); pre.textContent = `GET ${url}\n...取得中`;
+  try{
+    const res = await fetch(url); const text = await res.text();
+    pre.textContent = text; $("#recordsRaw").value = text; toast(`${name} を取得しました`);
+  }catch(e){ pre.textContent = `取得失敗: ${e.message}`; toast("取得エラー"); }
+}
+$$(".btnFetch").forEach(btn=>btn.addEventListener("click",()=>fetchFile(btn.dataset.file)));
+
+const drop=$("#dropZone");
+drop?.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("dragover");});
+drop?.addEventListener("dragleave",()=>drop.classList.remove("dragover"));
+drop?.addEventListener("drop",e=>{
+  e.preventDefault(); drop.classList.remove("dragover");
+  const f=e.dataTransfer.files?.[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{ $("#dropPreview").textContent=r.result; $("#recordsRaw").value=r.result; toast(`${f.name} を読み込みました`); };
+  r.readAsText(f,"utf-8");
+});
+
+function escapeHtml(s){return (s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function parseRecords(raw){
+  const lines=raw.split(/\r?\n/), rows=[];
+  for(const ln of lines){
+    const t=ln.trim(); if(!t) continue;
+    const m=t.match(/^(.{1,50}?)[：:|\t ]+(.+)$/);
+    if(m) rows.push({item:m[1].trim(), value:m[2].trim()}); else rows.push({item:t, value:""});
+  }
+  return rows.slice(0,2000);
+}
+function badgeFor(value){
+  const v=(value||"").toLowerCase();
+  if(v.includes("異常")||v.includes("リスク")||v.includes("要観察")||v.includes("不良")) return '<span class="badge err">注意</span>';
+  if(v.includes("軽度")||v.includes("境界")||v.includes("留意")) return '<span class="badge warn">留意</span>';
+  if(v.includes("正常")||v.includes("問題なし")||v.includes("良好")) return '<span class="badge ok">正常</span>';
+  return "";
+}
+$("#btnSummarize")?.addEventListener("click",()=>{
+  const raw=$("#recordsRaw").value; if(!raw.trim()){ toast("テキストが空です"); return; }
+  const rows=parseRecords(raw); const table=document.createElement("table");
+  table.innerHTML="<thead><tr><th>項目</th><th>状態</th><th>判定</th></tr></thead>";
+  const tbody=document.createElement("tbody");
+  for(const r of rows){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${escapeHtml(r.item)}</td><td>${escapeHtml(r.value)}</td><td>${badgeFor(r.value)}</td>`;
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody); $("#summaryTable").innerHTML=""; $("#summaryTable").appendChild(table);
+
+  const groups={"バイタル/呼吸/循環":[], "痛み/意識/活動":[], "排泄/水分/皮膚":[], "検査/リスク/その他":[]};
+  for(const r of rows){
+    const k=r.item; let bucket="検査/リスク/その他";
+    if(/体温|脈拍|呼吸|SpO2|血圧|循環|呼吸所見/i.test(k)) bucket="バイタル/呼吸/循環";
+    else if(/疼痛|痛み|意識|活動/i.test(k)) bucket="痛み/意識/活動";
+    else if(/排泄|尿|便|水分|皮膚/i.test(k)) bucket="排泄/水分/皮膚";
+    groups[bucket].push(r);
+  }
+  const pv=$("#prettyView"); pv.innerHTML="";
+  for(const [g,arr] of Object.entries(groups)){
+    const sec=document.createElement("div"); sec.className="card";
+    const items=arr.map(a=>`<div><strong>${escapeHtml(a.item)}:</strong> ${escapeHtml(a.value)} ${badgeFor(a.value)}</div>`).join("");
+    sec.innerHTML=`<h4>${g}</h4>${items||"<em>該当なし</em>"}`; pv.appendChild(sec);
+  }
+});
+
+function loadSettings(){
+  const saved=localStorage.getItem("ui_config_min");
+  if(saved){ try{ Object.assign(config, JSON.parse(saved)); }catch{} }
+  $("#cfgBase").value=config.baseUrl; $("#cfgFiles").value=config.endpoints.getFile;
+  refreshLabels();
+}
+function saveSettings(){
+  config.baseUrl=$("#cfgBase").value.trim()||config.baseUrl;
+  config.endpoints.getFile=$("#cfgFiles").value.trim()||config.endpoints.getFile;
+  localStorage.setItem("ui_config_min", JSON.stringify(config));
+  refreshLabels(); toast("設定を保存しました");
+}
+$("#btnSaveCfg")?.addEventListener("click", saveSettings);
+$("#btnResetCfg")?.addEventListener("click", ()=>{ localStorage.removeItem("ui_config_min"); location.reload(); });
+
+$("#ts").textContent=new Date().toLocaleString();
+
+(async function init(){
+  loadSettings();
+  const q=new URLSearchParams(location.search);
+  if(q.get("autostart")==="1"){ $("#btnStartLocal")?.click(); }
+  else{ (await isHealthy()) ? srvStatus().textContent="接続OK" : srvStatus().textContent="未接続"; }
+})();
+</script>
+</body>
+</html>
